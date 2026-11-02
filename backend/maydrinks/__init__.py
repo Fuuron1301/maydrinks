@@ -1,6 +1,6 @@
 """Application factory. SQL Server is required; no silent database fallback."""
 import os
-import logging
+import re
 from urllib.parse import quote_plus
 from pathlib import Path
 from flask import Flask, jsonify, request, g
@@ -16,14 +16,31 @@ from dotenv import load_dotenv
 from .models import db
 from .domain import DomainError
 
+load_dotenv(Path(__file__).resolve().parents[1] / '.env')
 limiter=Limiter(key_func=get_remote_address, default_limits=['300 per minute'])
 
+
+def sqlserver_connection_string(database=None):
+    """Use a complete secret ODBC string, or consistent Windows-auth local settings."""
+    explicit = os.environ.get('SQLSERVER_CONNECTION_STRING')
+    if explicit:
+        if database is not None:
+            raise RuntimeError('With SQLSERVER_CONNECTION_STRING, create the target database in SSMS first; then run Alembic. init-db only manages local Windows-auth databases.')
+        return explicit
+    server = os.environ.get('SQLSERVER_SERVER', r'(localdb)\MSSQLLocalDB')
+    name = database or os.environ.get('SQLSERVER_DATABASE', 'MayDrinks')
+    if not server.strip() or any(character in server for character in ';{}\r\n'):
+        raise RuntimeError('SQLSERVER_SERVER must be a valid local SQL Server instance.')
+    if not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,127}', name):
+        raise RuntimeError('SQLSERVER_DATABASE must use letters, digits and underscores.')
+    return f'DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={server};DATABASE={name};Trusted_Connection=yes;Encrypt=yes;TrustServerCertificate=yes;'
+
+
 def create_app(config=None):
-    load_dotenv(Path(__file__).resolve().parents[1]/'.env')
     app=Flask(__name__)
     if os.environ.get('APP_ENV')=='production' and not os.environ.get('SQLSERVER_CONNECTION_STRING'):
         raise RuntimeError('Production requires SQLSERVER_CONNECTION_STRING for a reachable Microsoft SQL Server.')
-    odbc=os.environ.get('SQLSERVER_CONNECTION_STRING',r'DRIVER={ODBC Driver 18 for SQL Server};SERVER=(localdb)\MSSQLLocalDB;DATABASE=MayDrinks;Trusted_Connection=yes;Encrypt=yes;TrustServerCertificate=yes;')
+    odbc=sqlserver_connection_string()
     production=os.environ.get('APP_ENV')=='production'
     engine_options={'pool_pre_ping':True,'pool_size':5,'max_overflow':5,'pool_recycle':600}
     if production:

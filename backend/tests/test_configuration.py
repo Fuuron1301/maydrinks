@@ -1,6 +1,6 @@
-"""Cross-origin and deployment safety regression tests."""
+"""Local SQL configuration, CLI safety, CORS and optional email regressions."""
 import pytest
-from maydrinks import create_app
+from maydrinks import create_app, sqlserver_connection_string
 
 
 def test_surge_origin_allowed():
@@ -15,7 +15,7 @@ def test_surge_origin_allowed():
 def test_readiness_does_not_query_database(monkeypatch):
     app = create_app()
     def no_query(*_args, **_kwargs):
-        raise AssertionError('Render probes must not wake Azure SQL')
+        raise AssertionError('Process readiness must not query SQL Server')
     monkeypatch.setattr('maydrinks.models.db.session.execute', no_query)
     result = app.test_client().get('/api/ready')
     assert result.status_code == 200
@@ -93,3 +93,62 @@ def test_brevo_mail_error_does_not_expose_token(monkeypatch):
         send_reset('customer@example.org', 'https://maydrinks.surge.sh/reset-password?token=secret')
     assert error.value.status == 503
     assert 'secret' not in error.value.message
+
+
+def test_local_database_settings_shared_with_app(monkeypatch):
+    from sqlalchemy.engine import make_url
+    monkeypatch.delenv('SQLSERVER_CONNECTION_STRING', raising=False)
+    monkeypatch.setenv('SQLSERVER_SERVER', r'.\SQLEXPRESS')
+    monkeypatch.setenv('SQLSERVER_DATABASE', 'MayDrinksTest_Config')
+    app = create_app()
+    configured = make_url(app.config['SQLALCHEMY_DATABASE_URI']).query['odbc_connect']
+    assert configured == sqlserver_connection_string()
+    assert r'SERVER=.\SQLEXPRESS;' in configured
+    assert 'DATABASE=MayDrinksTest_Config;' in configured
+    assert 'DATABASE=master;' in sqlserver_connection_string(database='master')
+
+
+def test_full_connection_string_takes_precedence(monkeypatch):
+    explicit = 'DRIVER={ODBC Driver 18 for SQL Server};SERVER=sql.example.org;DATABASE=MayDrinks;'
+    monkeypatch.setenv('SQLSERVER_CONNECTION_STRING', explicit)
+    monkeypatch.setenv('SQLSERVER_SERVER', 'ignored')
+    assert sqlserver_connection_string() == explicit
+
+
+@pytest.mark.parametrize('key,value', [
+    ('SQLSERVER_SERVER', 'localhost;DATABASE=unexpected'),
+    ('SQLSERVER_DATABASE', 'MayDrinks;DROP DATABASE master'),
+])
+def test_invalid_local_sql_settings_rejected(monkeypatch, key, value):
+    monkeypatch.delenv('SQLSERVER_CONNECTION_STRING', raising=False)
+    monkeypatch.setenv(key, value)
+    with pytest.raises(RuntimeError, match='SQLSERVER_'):
+        sqlserver_connection_string()
+
+
+def test_init_db_does_not_create_unintended_remote_database(monkeypatch):
+    import manage
+    monkeypatch.setenv('SQLSERVER_CONNECTION_STRING', 'SERVER=remote.example.org;DATABASE=MayDrinks;')
+    with pytest.raises(RuntimeError, match='SSMS'):
+        manage.init_database()
+
+
+def test_check_command_reads_current_sql_schema(app, capsys):
+    import manage
+    manage.check_database(app)
+    output = capsys.readouterr().out
+    assert 'SQL Server connection: OK' in output
+    assert 'fc2a96045963 (head)' in output
+    assert 'drinks: 16' in output
+
+
+def test_seed_again_preserves_existing_demo_records(app):
+    from sqlalchemy import select, func
+    from maydrinks.models import db, User, Order
+    from maydrinks.seed import seed
+    with app.app_context():
+        password_hash = db.session.get(User, 'user-admin').password_hash
+        before = db.session.scalar(select(func.count()).select_from(Order))
+        assert 'no existing data changed' in seed()['message']
+        assert db.session.get(User, 'user-admin').password_hash == password_hash
+        assert db.session.scalar(select(func.count()).select_from(Order)) == before

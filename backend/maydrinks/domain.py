@@ -181,7 +181,7 @@ def create_order(user, data, request_key):
     if not rows: raise DomainError('Giỏ hàng đang trống.')
     items=[price_item({'drink_id':r.drink_id,'quantity':r.quantity,'choices':json.loads(r.choices)}) for r in rows]
     check_stock(items)
-    subtotal=sum(i['quantity']*i['unit_price'] for i in items)
+    subtotal=integer(sum(i['quantity']*i['unit_price'] for i in items),'Tổng giá trị đơn',0,2000000000)
     discount=0; coupon_code=None
     if data.get('coupon'):
         coupon=get(Coupon,text(data['coupon'],'Mã giảm giá',40).upper(),True)
@@ -200,6 +200,8 @@ def create_order(user, data, request_key):
 
 NEXT={'pending':{'preparing'},'preparing':{'ready'},'ready':{'delivering','completed'},'delivering':{'completed'}}
 def transition(order,user,target,reason=''):
+    if not isinstance(target,str) or target not in ['pending','preparing','ready','delivering','completed','cancelled']:
+        raise DomainError('Trạng thái đơn không hợp lệ.')
     if target==order.status: return order
     if target=='cancelled':
         if order.status in ['completed','cancelled']: raise DomainError('Không thể hủy đơn này.',409)

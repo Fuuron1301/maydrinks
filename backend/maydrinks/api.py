@@ -142,7 +142,7 @@ def pay(key):
     data=payload(); order=owned_order(key)
     if order.status not in ['ready','delivering','completed']: raise DomainError('Chỉ ghi nhận COD khi đơn sẵn sàng giao hoặc đã hoàn tất.',409)
     payment=db.session.scalar(select(Payment).where(Payment.order_id==order.id))
-    if integer(data.get('amount'),'Số tiền thu')!=order.total: raise DomainError('Số tiền thu phải bằng tổng tiền đơn.')
+    if integer(data.get('amount'),'Số tiền thu',0,2000000000)!=order.total: raise DomainError('Số tiền thu phải bằng tổng tiền đơn.')
     if payment.status!='paid':
         payment.status='paid'; payment.actor_id=g.user.id; payment.paid_at=utcnow(); audit('payment.collected',order.id,str(order.total))
     return commit(order_data(order))

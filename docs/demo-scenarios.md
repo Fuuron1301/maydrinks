@@ -61,7 +61,8 @@ Seed cố ý để **Siro dâu = 0 l**, món **Trà dâu tươi** vẫn còn bá
 - Khách không xem đơn tài khoản khác.
 - Admin không tự khóa/hạ quyền tài khoản đang dùng.
 - Đăng xuất/đổi mật khẩu/khôi phục mật khẩu thu hồi session.
-- Khôi phục qua email cần địa chỉ thật trong hồ sơ và nhà cung cấp Brevo đã cấu hình; email seed `.example` không nhận được thư.
+- Local: nhập email hồ sơ, mở thư `.eml` mới nhất trong `backend/instance/mail-outbox/`, dùng link reset 15 phút/một lần. Không cần gửi email Internet.
+- Email gửi thật là tùy chọn SMTP/Brevo; seed `.example` không nhận thư trên Internet. Xem hướng dẫn README.
 
 ## Mô hình As-Is / To-Be (giả định, không phải khảo sát thực địa)
 
@@ -83,12 +84,21 @@ Seed cố ý để **Siro dâu = 0 l**, món **Trà dâu tươi** vẫn còn bá
 - Out: ngân hàng/thẻ thật, bản đồ, giao hàng real-time, dự báo kho/lợi nhuận nâng cao, tích điểm/đề xuất.
 - Quy mô demo nhỏ: khóa ghi toàn cục SQL Server; không tuyên bố phục vụ tải lớn.
 
-## Checklist nghiệm thu hosting
+## Checklist chạy local trước khi nộp
 
-- [ ] Backend HTTPS `/api/health` JSON xác nhận SQL Server, không phải HTML SPA.
-- [ ] Migration trên SQL cloud, firewall/TLS đúng, dữ liệu seed có chủ đích.
-- [ ] CORS GET/POST/Authorization/Idempotency-Key từ Surge.
-- [ ] Đăng nhập 3 vai trò từ Surge và đi đủ demo 1–6.
-- [ ] Quên mật khẩu tới hộp thư thật, token dùng một lần.
-- [ ] Cold start xử lý được; biết quota free và không cam kết SLA 24/7.
-- [ ] Không secret trong repo, tài khoản demo đã đổi mật khẩu.
+- [ ] Chạy `init-db → Alembic → seed → check` trên SQL Server Windows.
+- [ ] API và Vite cùng mở; `/api/health` trả JSON xác nhận SQL Server.
+- [ ] Đăng nhập 3 vai trò bằng mật khẩu trên máy seed và đi đủ demo 1–6.
+- [ ] Kiểm thử API, lint, build theo README; kiểm tra RTM MUST có bằng chứng.
+- [ ] Đề/ERD/use case, nguồn, migration và seed nằm trong source nộp.
+- [ ] Không `.env`, mật khẩu, outbox, cache hoặc DB runtime trên GitHub.
+
+## Checklist hosting giai đoạn sau — chưa thực hiện
+
+- [ ] API HTTPS và SQL Server trên AWS hoạt động, TLS/firewall đúng.
+- [ ] Migration và dữ liệu demo có chủ đích trên SQL cloud.
+- [ ] CORS GET/POST/Authorization/Idempotency-Key từ frontend public.
+- [ ] Đi đủ demo 1–6 từ frontend public qua API cloud.
+- [ ] Email tới hộp thư thật, token dùng một lần, người gửi được xác minh.
+- [ ] Kiểm tra giới hạn hosting/chi phí, không tự cam kết SLA 24/7.
+- [ ] Secret chỉ trong hosting secret store, tài khoản demo đã đổi mật khẩu.
