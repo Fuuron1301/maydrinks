@@ -3,7 +3,7 @@ import os
 import re
 from urllib.parse import quote_plus
 from pathlib import Path
-from flask import Flask, jsonify, request, g
+from flask import Flask, jsonify, request, g, send_from_directory
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -99,4 +99,17 @@ def create_app(config=None):
     from .api import api
     app.register_blueprint(auth,url_prefix='/api/auth')
     app.register_blueprint(api,url_prefix='/api')
+    dist_dir=Path(__file__).resolve().parents[2]/'dist'
+    @app.route('/',defaults={'path':''})
+    @app.route('/<path:path>')
+    def serve_frontend(path):
+        if path.startswith('api/'):
+            return jsonify(error='Not Found'),404
+        if dist_dir.exists():
+            target=(dist_dir/path).resolve()
+            if path and target.is_file() and str(target).startswith(str(dist_dir.resolve())):
+                return send_from_directory(dist_dir,path)
+            if (dist_dir/'index.html').is_file():
+                return send_from_directory(dist_dir,'index.html')
+        return jsonify(error='Not Found'),404
     return app
