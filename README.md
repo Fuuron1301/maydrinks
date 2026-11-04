@@ -142,8 +142,8 @@ $env:PYTHONPATH='backend'
 ```
 
 Lệnh `check` phải báo `SQL Server connection: OK`, revision `fc2a96045963 (head)`
-và trên database mới có **16 drinks, 15 ingredients, 6 orders**.
-Seed cũng tạo 3 size, 3 topping, công thức, 6 trạng thái đơn và phiếu nhập nháp.
+và trên database mới có **16 drinks, 15 ingredients, 5 orders**.
+Seed cũng tạo 3 size, 3 topping, công thức, 5 trạng thái đơn và phiếu nhập nháp.
 **Siro dâu = 0** là dữ liệu cố ý để demo chặn đơn thiếu nguyên liệu, không phải lỗi seed.
 
 `seed` không reset dữ liệu và không đổi mật khẩu database đã có tài khoản.
@@ -274,7 +274,7 @@ không chạy lại DDL trên database đã migration.
 - Giá = giá món + phụ thu size/đường/đá/topping, backend tính lại khi đặt.
 - Đơn chờ **chưa giữ chỗ tồn**; kiểm tra nguyên liệu khi đặt và khi nhận pha.
 - Trừ nguyên liệu tại `pending → preparing` cùng transaction với trạng thái/lịch sử.
-- Khách hủy khi `pending`; sau nhận pha chỉ admin hủy có lý do, không hoàn nguyên liệu đã dùng.
+- Chỉ khách sở hữu được hủy khi `pending` và chưa đủ 60 giây kể từ lúc tạo đơn. Hết 60 giây hoặc đã nhận pha thì khóa hủy; staff/admin không có quyền hủy. Backend kiểm tra thời hạn, tải lại trang không đặt lại đồng hồ.
 - Doanh thu chỉ ghi nhận đơn **completed + COD paid**; báo cáo dùng ranh giới ngày **UTC**.
 - Không thanh toán ngân hàng thật, bản đồ, giao hàng real-time hoặc SLA 24/7.
 - JSON đơn lưu snapshot lịch sử có chủ đích; bảng quan hệ SQL Server vẫn là nguồn dữ liệu chính.

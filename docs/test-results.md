@@ -1,3 +1,14 @@
+# Kiểm thử cập nhật quyền hủy — 04/11/2026
+
+- Quy tắc được chủ dự án chốt: chỉ khách sở hữu được hủy khi pending và thời gian từ created_at < 60 giây. Staff/Admin không có quyền hủy. Luồng trạng thái đơn chuyển trực tiếp từ `ready` (Sẵn sàng) sang `completed` (Hoàn tất), bỏ bước `delivering` (Đang giao).
+- Toàn bộ backend: **76 pass, 0 fail**, SQL Server thật trên database MayDrinksTest_* mới tạo riêng và dọn sau suite; database demo không bị reset.
+- Dùng ODBC Driver 18, Windows Authentication tới SQL Server; TEST_SQLSERVER_CONNECTION_STRING trỏ DB test riêng. CORS_ORIGINS trong phiên chạy test có localhost, 127.0.0.1 và maydrinks.surge.sh để kiểm tra đủ cấu hình CORS hiện hữu.
+- Test bổ sung: test_workers_cannot_cancel_via_either_endpoint (10 trường hợp staff/admin × 5 trạng thái, kiểm tra cả /cancel và /status); test_customer_cancellation_server_deadline (59/60/61 giây, tải lại không gia hạn, gửi lại không thêm lịch sử hủy).
+- Frontend: lint và build pass. Kiểm tra trình duyệt Edge với API mô phỏng: hiện đếm ngược, hết giờ khóa nút, reload vẫn hết hạn, đã nhận pha không có nút, staff/admin không có nút; không có lỗi JavaScript. Đây là UI test mô phỏng, tách biệt với test backend SQL thật ở trên.
+- Thay đổi thời hạn không cần migration; seed chỉ điều chỉnh thứ tự tạo dữ liệu mẫu, không cập nhật hoặc xóa dữ liệu demo đã có.
+
+## Kết quả lịch sử trước thay đổi (giữ để truy vết)
+
 # Kết quả kiểm thử — 03/11/2026
 
 **63 Pass · 0 Fail · 0 Skip · Microsoft SQL Server LocalDB · Alembic head**

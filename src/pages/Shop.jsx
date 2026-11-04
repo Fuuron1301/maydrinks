@@ -763,6 +763,56 @@ export function Orders({ user }) {
     </main>
   );
 }
+function CustomerCancellation({ order, busy, run }) {
+  const remainingAtReceipt = Math.max(
+    0,
+    Date.parse(order.cancel_deadline) - Date.parse(order.server_time),
+  );
+  const [clock, setClock] = useState(() => ({
+    serverTime: order.server_time,
+    elapsed: 0,
+  }));
+  useEffect(() => {
+    const receivedAt = performance.now();
+    const update = () => setClock({
+      serverTime: order.server_time,
+      elapsed: performance.now() - receivedAt,
+    });
+    const timer = window.setInterval(update, 250);
+    const onVisible = () => update();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [order.server_time, order.cancel_deadline]);
+  const elapsed = clock.serverTime === order.server_time ? clock.elapsed : 0;
+  const seconds = Math.max(0, Math.ceil((remainingAtReceipt - elapsed) / 1000));
+  const countdown = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  return (
+    <div>
+      <p className="muted">
+        {seconds > 0
+          ? `Còn ${countdown} để hủy. Chỉ được hủy trong 60 giây sau khi đặt và trước khi nhận pha.`
+          : "Đã hết thời hạn hủy đơn 60 giây."}
+      </p>
+      <button
+        id="cancel-customer-order"
+        disabled={busy || seconds === 0}
+        className="btn danger"
+        onClick={() => {
+          if (window.confirm("Bạn muốn hủy đơn này?"))
+            run("/orders/" + order.id + "/cancel", "POST", {
+              reason: "Khách hàng yêu cầu hủy",
+            });
+        }}
+      >
+        Hủy đơn
+      </button>
+    </div>
+  );
+}
+
 export function OrderDetail({ user, notify }) {
   const { id } = useParams(),
     [version, setVersion] = useState(0),
@@ -784,6 +834,11 @@ export function OrderDetail({ user, notify }) {
                 Tải lại trạng thái
               </button>
             </Title>
+            {o.status === "cancelled" && (
+              <div className="order-cancelled-banner" role="status">
+                <span aria-hidden="true">⊗</span>Đơn hàng đã được hủy thành công.
+              </div>
+            )}
             <div className="grid-2">
               <div className="card">
                 <h2>Món đã đặt</h2>
@@ -849,26 +904,14 @@ export function OrderDetail({ user, notify }) {
                   <h2>Thao tác</h2>
                   <ErrorBox error={error} />
                   {user.role === "customer" && o.status === "pending" && (
-                    <button
-                      disabled={busy}
-                      className="btn danger"
-                      onClick={() => {
-                        if (window.confirm("Bạn muốn hủy đơn này?"))
-                          run("/orders/" + o.id + "/cancel", "POST", {
-                            reason: "Khách hàng yêu cầu hủy",
-                          });
-                      }}
-                    >
-                      Hủy đơn
-                    </button>
+                    <CustomerCancellation order={o} busy={busy} run={run} />
                   )}
                   {["admin", "staff"].includes(user.role) && (
                     <div className="actions">
                       {{
                         pending: "preparing",
                         preparing: "ready",
-                        ready: "delivering",
-                        delivering: "completed",
+                        ready: "completed",
                       }[o.status] && (
                         <button
                           disabled={busy}
@@ -879,8 +922,7 @@ export function OrderDetail({ user, notify }) {
                               status: {
                                 pending: "preparing",
                                 preparing: "ready",
-                                ready: "delivering",
-                                delivering: "completed",
+                                ready: "completed",
                               }[o.status],
                             })
                           }
@@ -891,29 +933,14 @@ export function OrderDetail({ user, notify }) {
                               {
                                 pending: "preparing",
                                 preparing: "ready",
-                                ready: "delivering",
-                                delivering: "completed",
+                                ready: "completed",
                               }[o.status]
                             ]
                           }
                         </button>
                       )}
-                      {o.status === "ready" && (
-                        <button
-                          disabled={busy}
-                          className="btn secondary"
-                          onClick={() =>
-                            run("/orders/" + o.id + "/status", "POST", {
-                              expected_status: o.status,
-                              status: "completed",
-                            })
-                          }
-                        >
-                          Hoàn tất tại quầy
-                        </button>
-                      )}
                       {o.payment?.status !== "paid" &&
-                        ["ready", "delivering", "completed"].includes(
+                        ["ready", "completed"].includes(
                           o.status,
                         ) && (
                           <button
@@ -926,22 +953,6 @@ export function OrderDetail({ user, notify }) {
                             }
                           >
                             Xác nhận thu COD
-                          </button>
-                        )}
-                      {user.role === "admin" &&
-                        !["completed", "cancelled"].includes(o.status) && (
-                          <button
-                            disabled={busy}
-                            className="btn danger"
-                            onClick={() => {
-                              const reason = window.prompt("Lý do hủy đơn:");
-                              if (reason)
-                                run("/orders/" + o.id + "/cancel", "POST", {
-                                  reason,
-                                });
-                            }}
-                          >
-                            Hủy đơn
                           </button>
                         )}
                     </div>

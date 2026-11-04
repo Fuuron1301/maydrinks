@@ -129,7 +129,7 @@ def update_status(key):
     return commit(order_data(order))
 
 @api.post('/orders/<key>/cancel')
-@require()
+@require('customer')
 def cancel(key):
     data=payload(); order=owned_order(key)
     if order.status=='cancelled': return commit(order_data(order))
@@ -140,7 +140,7 @@ def cancel(key):
 @require('staff','admin')
 def pay(key):
     data=payload(); order=owned_order(key)
-    if order.status not in ['ready','delivering','completed']: raise DomainError('Chỉ ghi nhận COD khi đơn sẵn sàng giao hoặc đã hoàn tất.',409)
+    if order.status not in ['ready','completed']: raise DomainError('Chỉ ghi nhận COD khi đơn sẵn sàng hoặc đã hoàn tất.',409)
     payment=db.session.scalar(select(Payment).where(Payment.order_id==order.id))
     if integer(data.get('amount'),'Số tiền thu',0,2000000000)!=order.total: raise DomainError('Số tiền thu phải bằng tổng tiền đơn.')
     if payment.status!='paid':
@@ -380,7 +380,7 @@ def reports():
             entry['quantity']+=item['quantity']; entry['revenue']+=revenue
             categories[get(Category,get(Drink,item['drink_id']).category_id).name]+=revenue
     created=list(db.session.scalars(select(Order).where(Order.created_at>=a,Order.created_at<b)))
-    states={s:sum(o.status==s for o in created) for s in ['pending','preparing','ready','delivering','completed','cancelled']}
+    states={s:sum(o.status==s for o in created) for s in ['pending','preparing','ready','completed','cancelled']}
     consumption={}
     for tx in db.session.scalars(select(InventoryTransaction).where(InventoryTransaction.kind=='sale',InventoryTransaction.created_at>=a,InventoryTransaction.created_at<b)):
         ing=get(Ingredient,tx.ingredient_id); entry=consumption.setdefault(ing.id,{'name':ing.name,'unit':ing.unit,'quantity':0,'cost':0})

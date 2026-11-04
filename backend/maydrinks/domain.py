@@ -3,7 +3,7 @@ import json
 import re
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import g
 from sqlalchemy import select
 from .models import *
@@ -148,12 +148,17 @@ def stock_change(ingredient, delta, kind, actor, reason, order_id=None, receipt_
 def order_items(order):
     return [{**dump(i),'choices':json.loads(i.choices),'requirements':json.loads(i.requirements)} for i in db.session.scalars(select(OrderItem).where(OrderItem.order_id==order.id))]
 
+CANCELLATION_SECONDS = 60
+
+def cancellation_deadline(order):
+    return order.created_at + timedelta(seconds=CANCELLATION_SECONDS)
+
 def order_data(order):
     items=order_items(order)
     for item in items: item.pop('requirements',None)
     history=[{**dump(h),'actor':get(Profile,h.actor_id).name} for h in db.session.scalars(select(StatusHistory).where(StatusHistory.order_id==order.id).order_by(StatusHistory.created_at))]
     payment=db.session.scalar(select(Payment).where(Payment.order_id==order.id))
-    return {**dump(order,('request_key',)),'items':items,'history':history,'payment':dump(payment) if payment else None}
+    return {**dump(order,('request_key',)),'items':items,'history':history,'payment':dump(payment) if payment else None, 'cancel_deadline':cancellation_deadline(order).isoformat()+'Z', 'server_time':utcnow().isoformat()+'Z'}
 
 def cart_for(user):
     cart=db.session.scalar(select(Cart).where(Cart.user_id==user.id))
@@ -198,15 +203,18 @@ def create_order(user, data, request_key):
     db.session.flush()
     return order
 
-NEXT={'pending':{'preparing'},'preparing':{'ready'},'ready':{'delivering','completed'},'delivering':{'completed'}}
+NEXT={'pending':{'preparing'},'preparing':{'ready'},'ready':{'completed'}}
 def transition(order,user,target,reason=''):
-    if not isinstance(target,str) or target not in ['pending','preparing','ready','delivering','completed','cancelled']:
+    if not isinstance(target,str) or target not in ['pending','preparing','ready','completed','cancelled']:
         raise DomainError('Trạng thái đơn không hợp lệ.')
+    if target=='cancelled' and user.role!='customer':
+        raise DomainError('Chỉ khách hàng được hủy đơn của mình.',403)
     if target==order.status: return order
     if target=='cancelled':
         if order.status in ['completed','cancelled']: raise DomainError('Không thể hủy đơn này.',409)
         if user.role=='customer' and (order.user_id!=user.id or order.status!='pending'): raise DomainError('Chỉ được hủy đơn của mình trước khi pha chế.',403)
-        if user.role=='staff': raise DomainError('Chỉ quản lý được hủy đơn đang xử lý.',403)
+        if utcnow() >= cancellation_deadline(order):
+            raise DomainError('Đã hết thời hạn hủy đơn 60 giây.',409)
         reason=text(reason,'Lý do hủy',1000)
         payment=db.session.scalar(select(Payment).where(Payment.order_id==order.id))
         if payment.status=='paid': raise DomainError('Đơn đã thu tiền không thể hủy trong phạm vi COD này.',409)

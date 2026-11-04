@@ -78,13 +78,8 @@ stateDiagram-v2
   [*] --> pending
   pending --> preparing: Staff/Admin nhận pha, kiểm tra và trừ kho
   preparing --> ready: Pha xong
-  ready --> delivering: Giao hàng
-  ready --> completed: Nhận tại quầy
-  delivering --> completed: Giao xong
-  pending --> cancelled: Khách sở hữu hoặc Admin
-  preparing --> cancelled: Admin, không hoàn kho
-  ready --> cancelled: Admin, chưa thu COD
-  delivering --> cancelled: Admin, chưa thu COD
+  ready --> completed: Hoàn tất
+  pending --> cancelled: Chỉ khách sở hữu, trong 60 giây từ tạo đơn
   completed --> [*]
   cancelled --> [*]
 ```

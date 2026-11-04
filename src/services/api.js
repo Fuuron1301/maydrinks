@@ -83,7 +83,6 @@ export const labels = {
   pending: "Chờ xác nhận",
   preparing: "Đang pha chế",
   ready: "Sẵn sàng",
-  delivering: "Đang giao",
   completed: "Hoàn tất",
   cancelled: "Đã hủy",
 };

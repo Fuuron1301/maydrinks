@@ -119,9 +119,9 @@ def test_cancel_stock_policy_before_and_after_preparing(app, client, after_prepa
     if after_preparing:
         assert state(client, admin, order_id, 'pending', 'preparing').status_code == 200
         assert client.post('/api/orders/' + order_id + '/cancel', headers=customer, json={'reason': 'Hủy'}).status_code == 403
-    cancelled = client.post('/api/orders/' + order_id + '/cancel', headers=admin if after_preparing else customer,
+    cancelled = client.post('/api/orders/' + order_id + '/cancel', headers=customer,
                             json={'reason': 'Kiểm thử hủy'})
-    assert cancelled.status_code == 200
+    assert cancelled.status_code == (403 if after_preparing else 200)
     with app.app_context():
         assert db.session.get(Ingredient, 'coffee').quantity == before - (Decimal('.018') if after_preparing else 0)
         count = db.session.scalar(select(func.count()).select_from(InventoryTransaction).where(
@@ -444,7 +444,7 @@ def test_delivery_complete_then_collect_cod_and_report_metrics(app, client):
     order_id = new_order(app, quantity=2)
     staff, admin = headers(app, 'staff'), headers(app)
     before = client.get('/api/admin/reports', headers=admin).json
-    for old, new in [('pending', 'preparing'), ('preparing', 'ready'), ('ready', 'delivering'), ('delivering', 'completed')]:
+    for old, new in [('pending', 'preparing'), ('preparing', 'ready'), ('ready', 'completed')]:
         assert state(client, staff, order_id, old, new).status_code == 200
     assert client.get('/api/admin/reports', headers=admin).json['revenue'] == before['revenue']
     assert client.post('/api/orders/' + order_id + '/payment', headers=staff, json={'amount': 48000}).status_code == 200
@@ -458,8 +458,8 @@ def test_delivery_complete_then_collect_cod_and_report_metrics(app, client):
     coffee_after = next(r['quantity'] for r in report['consumption'] if r['name'] == 'Cà phê hạt')
     assert coffee_after == pytest.approx(coffee_before + .036)
     order = client.get('/api/orders/' + order_id, headers=staff).json
-    assert [row['status'] for row in order['history']] == ['pending', 'preparing', 'ready', 'delivering', 'completed']
-    assert client.post('/api/orders/' + order_id + '/cancel', headers=admin, json={'reason': 'Đã hoàn tất'}).status_code == 409
+    assert [row['status'] for row in order['history']] == ['pending', 'preparing', 'ready', 'completed']
+    assert client.post('/api/orders/' + order_id + '/cancel', headers=admin, json={'reason': 'Đã hoàn tất'}).status_code == 403
 
 
 def test_receipt_draft_creation_and_edit_do_not_change_stock(app, client):
@@ -509,3 +509,49 @@ def test_order_value_limit_returns_client_error_without_writing(app, client):
     assert result.status_code == 400 and 'Tổng giá trị đơn' in result.json['error']
     with app.app_context():
         assert db.session.scalar(select(func.count()).select_from(Order)) == count_before
+
+
+@pytest.mark.parametrize('role', ['admin', 'staff'])
+@pytest.mark.parametrize('status', ['pending', 'preparing', 'ready', 'completed', 'cancelled'])
+def test_workers_cannot_cancel_via_either_endpoint(app, client, role, status):
+    auth = headers(app, role)
+    with app.app_context():
+        order = db.session.scalar(select(Order).where(Order.status == status))
+        key = order.id
+        before_history = db.session.scalar(select(func.count()).select_from(StatusHistory))
+        before_tx = db.session.scalar(select(func.count()).select_from(InventoryTransaction))
+        before_audit = db.session.scalar(select(func.count()).select_from(Audit))
+    assert client.post('/api/orders/' + key + '/cancel', headers=auth,
+                       json={'reason': 'Không có quyền'}).status_code == 403
+    assert state(client, auth, key, status, 'cancelled').status_code == 403
+    with app.app_context():
+        assert db.session.get(Order, key).status == status
+        assert db.session.scalar(select(func.count()).select_from(StatusHistory)) == before_history
+        assert db.session.scalar(select(func.count()).select_from(InventoryTransaction)) == before_tx
+        assert db.session.scalar(select(func.count()).select_from(Audit)) == before_audit
+
+
+@pytest.mark.parametrize('age,expected', [(59, 200), (60, 409), (61, 409)])
+def test_customer_cancellation_server_deadline(app, client, monkeypatch, age, expected):
+    key = new_order(app)
+    auth = headers(app, 'customer')
+    now = utcnow().replace(microsecond=0)
+    with app.app_context():
+        db.session.get(Order, key).created_at = now - timedelta(seconds=age)
+        db.session.commit()
+        stock = db.session.get(Ingredient, 'coffee').quantity
+    monkeypatch.setattr('maydrinks.domain.utcnow', lambda: now)
+    detail = client.get('/api/orders/' + key, headers=auth).json
+    assert detail['cancel_deadline'] == (now + timedelta(seconds=60-age)).isoformat() + 'Z'
+    assert detail['server_time'] == now.isoformat() + 'Z'
+    assert client.get('/api/orders/' + key, headers=auth).json['cancel_deadline'] == detail['cancel_deadline']
+    response = client.post('/api/orders/' + key + '/cancel', headers=auth, json={})
+    assert response.status_code == expected
+    if expected == 200:
+        assert client.post('/api/orders/' + key + '/cancel', headers=auth, json={}).status_code == 200
+    with app.app_context():
+        assert db.session.get(Ingredient, 'coffee').quantity == stock
+        assert db.session.get(Order, key).status == ('cancelled' if expected == 200 else 'pending')
+        count = db.session.scalar(select(func.count()).select_from(StatusHistory).where(
+            StatusHistory.order_id == key, StatusHistory.status == 'cancelled'))
+        assert count == (1 if expected == 200 else 0)

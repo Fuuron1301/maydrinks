@@ -1,4 +1,4 @@
-﻿"""Repeatable demonstration data, using the same business operations as the API."""
+"""Repeatable demonstration data, using the same business operations as the API."""
 import os
 import secrets
 from pathlib import Path
@@ -49,19 +49,19 @@ def seed():
     db.session.add(Coupon(code='MAY10',percent=10,minimum=50000,expires_at=utcnow()+timedelta(days=365)))
     db.session.flush()
     customer=get(User,'user-customer'); cart=get(Cart,'cart-customer')
-    for index,target in enumerate(['pending','preparing','ready','delivering','completed','cancelled']):
+    for index,target in enumerate(['pending','preparing','ready','completed','cancelled']):
         g.user=customer
         raw={'size':'size-m','sugar':'sugar-50','ice':'ice-50','toppings':[]}
         db.session.add(CartItem(cart_id=cart.id,drink_id=f'M{index+1:03}',quantity=1,choices=json_text(raw))); db.session.flush()
         order=create_order(customer,{'recipient':'Nguyễn Minh Anh','phone':'0900000003','address':'24 Nguyễn Huệ, TP. Hồ Chí Minh','note':'Đơn mẫu cho kịch bản nghiệm thu.'},'seed-'+str(index))
-        order.created_at=utcnow()-timedelta(days=index%3)
         g.user=admin
         if target=='cancelled': transition(order,customer,target,'Khách thay đổi kế hoạch trước khi pha chế')
         else:
-            for status in ['preparing','ready','delivering','completed']:
+            for status in ['preparing','ready','completed']:
                 if target=='pending': break
                 transition(order,admin,status)
                 if status==target: break
+        order.created_at=utcnow()-timedelta(days=index%3)
         if target=='completed':
             payment=db.session.scalar(select(Payment).where(Payment.order_id==order.id)); payment.status='paid'; payment.actor_id=admin.id; payment.paid_at=utcnow(); order.completed_at=utcnow()
         db.session.flush()
@@ -72,4 +72,4 @@ def seed():
     if not current_app.testing:
         path=Path(current_app.instance_path)/'demo-accounts.json'; path.parent.mkdir(parents=True,exist_ok=True)
         path.write_text(json_text(credentials),encoding='utf-8')
-    return {'message':'Seeded 16 drinks, 15 ingredients, 3 sizes, 3 toppings, 6 orders.','credentials':credentials}
+    return {'message':'Seeded 16 drinks, 15 ingredients, 3 sizes, 3 toppings, 5 orders.','credentials':credentials}

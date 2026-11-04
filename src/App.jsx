@@ -19,6 +19,7 @@ import {
   Orders,
   OrderDetail,
 } from "./pages/Shop";
+import { StaffBoard, StaffOrders, StaffOrderDetail } from "./pages/StaffPages";
 import { Auth, PasswordPage, Account } from "./pages/Account";
 import { Dashboard, Reports, MenuAdmin, Inventory } from "./pages/AdminCore";
 import {
@@ -70,7 +71,7 @@ function Workspace({ type, children }) {
           ["/staff/orders", "Danh sách đơn"],
         ];
   return (
-    <div className="work-shell">
+    <div className={"work-shell" + (type === "staff" ? " staff-work-shell" : "")}>
       <nav className="work-nav" aria-label="Khu vực làm việc">
         {links.map(([to, text]) => (
           <NavLink key={to} to={to}>
@@ -228,15 +229,15 @@ function AppRoutes({
       <Route path="/staff" element={<Navigate to="/staff/board" replace />} />
       <Route
         path="/staff/board"
-        element={staff(<Orders user={session.user} />)}
+        element={staff(<StaffBoard notify={notify} />)}
       />
       <Route
         path="/staff/orders"
-        element={staff(<Orders user={session.user} />)}
+        element={staff(<StaffOrders />)}
       />
       <Route
         path="/staff/orders/:id"
-        element={staff(<OrderDetail user={session.user} notify={notify} />)}
+        element={staff(<StaffOrderDetail notify={notify} />)}
       />
       <Route
         path="/admin"

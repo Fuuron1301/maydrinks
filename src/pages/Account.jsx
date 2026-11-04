@@ -1,18 +1,642 @@
 import { useState } from 'react';
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  Link,
+  Navigate,
+  useNavigate,
+  useSearchParams
+} from 'react-router-dom';
+
 import { api, setToken } from '../services/api';
 import { ErrorBox, Field, Title } from '../components/UI';
+import AccountHistory from './AccountHistory';
+import './Account.css';
 
-export function Auth({ mode='login', user, signedIn, notify }) {
-  const [params] = useSearchParams(), navigate=useNavigate();
-  const [form,setForm]=useState({username:'',password:'',name:'',phone:'',email:'',address:''});
-  const [error,setError]=useState(null),[busy,setBusy]=useState(false);
-  const next=params.get('next');
-  if (user) return <Navigate to={user.role==='admin'?'/admin/overview':user.role==='staff'?'/staff/board':'/account'} replace/>;
-  const register=mode==='register';
-  return <main className="auth-layout"><div className="auth-art"><span className="eyebrow">Mây Drinks</span><h2>Một ngày ngon lành bắt đầu từ đây.</h2><p>Đăng nhập để chọn món và theo dõi tiến trình đơn hàng.</p><img src="/assets/our-story.jpg" alt="Quầy pha chế tại Mây Drinks"/></div><div className="auth-form"><Title title={register?'Tạo tài khoản':'Chào mừng trở lại'} sub={register?'Tạo tài khoản khách hàng để bắt đầu đặt món.':'Đăng nhập bằng tài khoản được cấp hoặc đã đăng ký.'}/><form onSubmit={async e=>{e.preventDefault();setBusy(true);setError(null);try{const result=await api('/auth/'+(register?'register':'login'),{method:'POST',body:register?form:{username:form.username,password:form.password}});setToken(result.token);signedIn(result.user);notify('Đăng nhập thành công');navigate(next?.startsWith('/')&&!next.startsWith('//')?next:result.user.role==='admin'?'/admin/overview':result.user.role==='staff'?'/staff/board':'/menu',{replace:true});}catch(err){setError(err)}finally{setBusy(false)}}}>
-  {register&&<><Field id="register-name" label="Họ tên" required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/><Field id="register-phone" label="Số điện thoại" type="tel" required value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/><Field id="register-email" label="Email (để lấy lại mật khẩu)" type="email" required value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/><Field id="register-address" label="Địa chỉ" value={form.address} onChange={e=>setForm({...form,address:e.target.value})}/></>}
-  <Field id="auth-username" label={register?'Tên đăng nhập (3–80 ký tự không dấu, số, . _ -)':'Tên đăng nhập hoặc số điện thoại'} autoComplete="username" required minLength={register?3:undefined} maxLength={register?80:undefined} value={form.username} onChange={e=>setForm({...form,username:e.target.value})}/><Field id="auth-password" label="Mật khẩu" type="password" autoComplete={register?'new-password':'current-password'} required minLength={register?8:undefined} value={form.password} onChange={e=>setForm({...form,password:e.target.value})}/><ErrorBox error={error}/><button id="auth-submit" className="btn full" disabled={busy}>{busy?'Đang xử lý…':register?'Tạo tài khoản':'Đăng nhập'}</button></form><p className="auth-links">{register?<Link to="/login">Đã có tài khoản? Đăng nhập</Link>:<><Link to="/register">Tạo tài khoản</Link> · <Link to="/forgot-password">Quên mật khẩu?</Link></>}</p></div></main>;
+
+export function Auth({
+  mode = 'login',
+  user,
+  signedIn,
+  notify
+}) {
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+
+  const [form, setForm] = useState({
+    username: '',
+    password: '',
+    name: '',
+    phone: '',
+    email: '',
+    address: ''
+  });
+
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const next = params.get('next');
+
+  if (user) {
+    return (
+      <Navigate
+        to={
+          user.role === 'admin'
+            ? '/admin/overview'
+            : user.role === 'staff'
+              ? '/staff/board'
+              : '/account'
+        }
+        replace
+      />
+    );
+  }
+
+  const register = mode === 'register';
+
+  return (
+    <main className="auth-layout">
+
+      <div className="auth-art">
+        <span className="eyebrow">
+          Mây Drinks
+        </span>
+
+        <h2>
+          Một ngày ngon lành bắt đầu từ đây.
+        </h2>
+
+        <p>
+          Đăng nhập để chọn món và theo dõi tiến trình đơn hàng.
+        </p>
+
+        <img
+          src="/assets/our-story.jpg"
+          alt="Quầy pha chế tại Mây Drinks"
+        />
+      </div>
+
+      <div className="auth-form">
+        <Title
+          title={
+            register
+              ? 'Tạo tài khoản'
+              : 'Chào mừng trở lại'
+          }
+          sub={
+            register
+              ? 'Tạo tài khoản khách hàng để bắt đầu đặt món.'
+              : 'Đăng nhập bằng tài khoản được cấp hoặc đã đăng ký.'
+          }
+        />
+
+        <form
+          onSubmit={async e => {
+            e.preventDefault();
+            setBusy(true);
+            setError(null);
+
+            try {
+              const result = await api(
+                '/auth/' + (register ? 'register' : 'login'),
+                {
+                  method: 'POST',
+                  body: register
+                    ? form
+                    : {
+                        username: form.username,
+                        password: form.password
+                      }
+                }
+              );
+
+              setToken(result.token);
+              signedIn(result.user);
+              notify('Đăng nhập thành công');
+
+              navigate(
+                next?.startsWith('/') && !next.startsWith('//')
+                  ? next
+                  : result.user.role === 'admin'
+                    ? '/admin/overview'
+                    : result.user.role === 'staff'
+                      ? '/staff/board'
+                      : '/menu',
+                { replace: true }
+              );
+            } catch (err) {
+              setError(err);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+
+          {register && (
+            <>
+              <Field
+                id="register-name"
+                label="Họ tên"
+                required
+                value={form.name}
+                onChange={e =>
+                  setForm({
+                    ...form,
+                    name: e.target.value
+                  })
+                }
+              />
+
+              <Field
+                id="register-phone"
+                label="Số điện thoại"
+                type="tel"
+                required
+                value={form.phone}
+                onChange={e =>
+                  setForm({
+                    ...form,
+                    phone: e.target.value
+                  })
+                }
+              />
+
+              <Field
+                id="register-email"
+                label="Email (để lấy lại mật khẩu)"
+                type="email"
+                required
+                value={form.email}
+                onChange={e =>
+                  setForm({
+                    ...form,
+                    email: e.target.value
+                  })
+                }
+              />
+
+              <Field
+                id="register-address"
+                label="Địa chỉ"
+                value={form.address}
+                onChange={e =>
+                  setForm({
+                    ...form,
+                    address: e.target.value
+                  })
+                }
+              />
+            </>
+          )}
+
+          <Field
+            id="auth-username"
+            label={
+              register
+                ? 'Tên đăng nhập (3–80 ký tự không dấu, số, . _ -)'
+                : 'Tên đăng nhập hoặc số điện thoại'
+            }
+            autoComplete="username"
+            required
+            minLength={register ? 3 : undefined}
+            maxLength={register ? 80 : undefined}
+            value={form.username}
+            onChange={e =>
+              setForm({
+                ...form,
+                username: e.target.value
+              })
+            }
+          />
+
+          <Field
+            id="auth-password"
+            label="Mật khẩu"
+            type="password"
+            autoComplete={
+              register
+                ? 'new-password'
+                : 'current-password'
+            }
+            required
+            minLength={register ? 8 : undefined}
+            value={form.password}
+            onChange={e =>
+              setForm({
+                ...form,
+                password: e.target.value
+              })
+            }
+          />
+
+          <ErrorBox error={error} />
+
+          <button
+            id="auth-submit"
+            className="btn full"
+            disabled={busy}
+          >
+            {busy
+              ? 'Đang xử lý…'
+              : register
+                ? 'Tạo tài khoản'
+                : 'Đăng nhập'}
+          </button>
+
+        </form>
+
+        <p className="auth-links">
+          {register ? (
+            <Link to="/login">
+              Đã có tài khoản? Đăng nhập
+            </Link>
+          ) : (
+            <>
+              <Link to="/register">
+                Tạo tài khoản
+              </Link>
+              {' · '}
+              <Link to="/forgot-password">
+                Quên mật khẩu?
+              </Link>
+            </>
+          )}
+        </p>
+      </div>
+    </main>
+  );
 }
-export function PasswordPage({reset=false,notify}){const [params]=useSearchParams(),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[message,setMessage]=useState(''),[error,setError]=useState(null),[busy,setBusy]=useState(false);return <main className="container narrow"><Title title={reset?'Đặt lại mật khẩu':'Quên mật khẩu'} sub={reset?'Nhập mật khẩu mới từ liên kết trong email.':'Nhập email đã đăng ký để nhận liên kết khôi phục.'}/><div className="card"><form onSubmit={async e=>{e.preventDefault();setBusy(true);setError(null);try{const result=await api('/auth/'+(reset?'reset-password':'forgot-password'),{method:'POST',body:reset?{token:params.get('token'),password}:{email}});setMessage(result.message);notify(result.message)}catch(err){setError(err)}finally{setBusy(false)}}}>{reset?<Field id="reset-new-password" label="Mật khẩu mới" type="password" autoComplete="new-password" minLength="8" required value={password} onChange={e=>setPassword(e.target.value)}/>:<Field id="forgot-email" label="Email" type="email" required value={email} onChange={e=>setEmail(e.target.value)}/>}<ErrorBox error={error}/>{message&&<div className="alert info" role="status">{message}</div>}<button id="password-submit" className="btn" disabled={busy}>{busy?'Đang gửi…':reset?'Lưu mật khẩu':'Gửi hướng dẫn'}</button> <Link to="/login">Về đăng nhập</Link></form></div></main>}
-export function Account({user,updated,logout,notify}){const [profile,setProfile]=useState({name:user.name||'',phone:user.phone||'',email:user.email||'',address:user.address||''}),[secrets,setSecrets]=useState({current_password:'',password:''}),[profileError,setProfileError]=useState(null),[passwordError,setPasswordError]=useState(null),[profileBusy,setProfileBusy]=useState(false),[passwordBusy,setPasswordBusy]=useState(false);return <main className="container narrow"><Title title="Tài khoản của tôi" sub={'Tên đăng nhập: '+user.username+' · Vai trò: '+({customer:'Khách hàng',staff:'Nhân viên',admin:'Quản trị'}[user.role])}/><div className="grid-2"><form className="card" onSubmit={async e=>{e.preventDefault();setProfileBusy(true);setProfileError(null);try{const next=await api('/auth/profile',{method:'PATCH',body:profile});updated(next);notify('Đã lưu thông tin tài khoản')}catch(err){setProfileError(err)}finally{setProfileBusy(false)}}}><h2>Thông tin liên hệ</h2>{[['name','Họ tên'],['phone','Số điện thoại'],['email','Email'],['address','Địa chỉ']].map(([key,label])=><Field key={key} id={'profile-'+key} label={label} type={key==='email'?'email':'text'} required={key==='name'||key==='phone'} value={profile[key]} onChange={e=>setProfile({...profile,[key]:e.target.value})}/>)}<ErrorBox error={profileError}/><button id="profile-save" className="btn" disabled={profileBusy}>Lưu thay đổi</button></form><div className="stack"><form className="card" onSubmit={async e=>{e.preventDefault();setPasswordBusy(true);setPasswordError(null);try{await api('/auth/change-password',{method:'POST',body:secrets});notify('Đã đổi mật khẩu, hãy đăng nhập lại');setToken('');logout()}catch(err){setPasswordError(err)}finally{setPasswordBusy(false)}}}><h2>Đổi mật khẩu</h2><Field id="current-password" label="Mật khẩu hiện tại" type="password" autoComplete="current-password" required value={secrets.current_password} onChange={e=>setSecrets({...secrets,current_password:e.target.value})}/><Field id="new-password" label="Mật khẩu mới" type="password" autoComplete="new-password" minLength="8" required value={secrets.password} onChange={e=>setSecrets({...secrets,password:e.target.value})}/><ErrorBox error={passwordError}/><button id="change-password" className="btn secondary" disabled={passwordBusy}>Đổi mật khẩu</button></form>{user.role==='customer'&&<Link className="btn secondary" to="/orders">Xem đơn hàng của tôi</Link>}</div></div></main>}
+
+
+export function PasswordPage({
+  reset = false,
+  notify
+}) {
+  const [params] = useSearchParams();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <main className="container narrow">
+
+      <Title
+        title={
+          reset
+            ? 'Đặt lại mật khẩu'
+            : 'Quên mật khẩu'
+        }
+        sub={
+          reset
+            ? 'Nhập mật khẩu mới từ liên kết trong email.'
+            : 'Nhập email đã đăng ký để nhận liên kết khôi phục.'
+        }
+      />
+
+      <div className="card">
+        <form
+          onSubmit={async e => {
+            e.preventDefault();
+            setBusy(true);
+            setError(null);
+
+            try {
+              const result = await api(
+                '/auth/' + (
+                  reset
+                    ? 'reset-password'
+                    : 'forgot-password'
+                ),
+                {
+                  method: 'POST',
+                  body: reset
+                    ? {
+                        token: params.get('token'),
+                        password
+                      }
+                    : { email }
+                }
+              );
+
+              setMessage(result.message);
+              notify(result.message);
+            } catch (err) {
+              setError(err);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+
+          {reset ? (
+            <Field
+              id="reset-new-password"
+              label="Mật khẩu mới"
+              type="password"
+              autoComplete="new-password"
+              minLength="8"
+              required
+              value={password}
+              onChange={e =>
+                setPassword(e.target.value)
+              }
+            />
+          ) : (
+            <Field
+              id="forgot-email"
+              label="Email"
+              type="email"
+              required
+              value={email}
+              onChange={e =>
+                setEmail(e.target.value)
+              }
+            />
+          )}
+
+          <ErrorBox error={error} />
+
+          {message && (
+            <div
+              className="alert info"
+              role="status"
+            >
+              {message}
+            </div>
+          )}
+
+          <button
+            id="password-submit"
+            className="btn"
+            disabled={busy}
+          >
+            {busy
+              ? 'Đang gửi…'
+              : reset
+                ? 'Lưu mật khẩu'
+                : 'Gửi hướng dẫn'}
+          </button>
+
+          {' '}
+
+          <Link to="/login">
+            Về đăng nhập
+          </Link>
+
+        </form>
+      </div>
+    </main>
+  );
+}
+
+
+export function Account({
+  user,
+  updated,
+  logout,
+  notify
+}) {
+  const [profile, setProfile] = useState({
+    name: user.name || '',
+    phone: user.phone || '',
+    email: user.email || '',
+    address: user.address || ''
+  });
+
+  const [secrets, setSecrets] = useState({
+    current_password: '',
+    password: ''
+  });
+
+  const [profileError, setProfileError] = useState(null);
+  const [passwordError, setPasswordError] = useState(null);
+
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [passwordBusy, setPasswordBusy] = useState(false);
+
+  const profileForm = (
+<form
+          className="card"
+          onSubmit={async e => {
+            e.preventDefault();
+            setProfileBusy(true);
+            setProfileError(null);
+
+            try {
+              const next = await api(
+                '/auth/profile',
+                {
+                  method: 'PATCH',
+                  body: profile
+                }
+              );
+
+              updated(next);
+              notify('Đã lưu thông tin tài khoản');
+            } catch (err) {
+              setProfileError(err);
+            } finally {
+              setProfileBusy(false);
+            }
+          }}
+        >
+
+          <h2>
+            Thông tin liên hệ
+          </h2>
+
+          {[
+            ['name', 'Họ tên'],
+            ['phone', 'Số điện thoại'],
+            ['email', 'Email'],
+            ['address', 'Địa chỉ']
+          ].map(([key, label]) => (
+            <Field
+              key={key}
+              id={'profile-' + key}
+              label={label}
+              type={
+                key === 'email'
+                  ? 'email'
+                  : 'text'
+              }
+              required={
+                key === 'name' ||
+                key === 'phone'
+              }
+              value={profile[key]}
+              onChange={e =>
+                setProfile({
+                  ...profile,
+                  [key]: e.target.value
+                })
+              }
+            />
+          ))}
+
+          <ErrorBox error={profileError} />
+
+          <button
+            id="profile-save"
+            className="btn"
+            disabled={profileBusy}
+          >
+            Lưu thay đổi
+          </button>
+
+        </form>
+  );
+  const passwordForm = (
+<form
+            className="card"
+            onSubmit={async e => {
+              e.preventDefault();
+              setPasswordBusy(true);
+              setPasswordError(null);
+
+              try {
+                await api(
+                  '/auth/change-password',
+                  {
+                    method: 'POST',
+                    body: secrets
+                  }
+                );
+
+                notify(
+                  'Đã đổi mật khẩu, hãy đăng nhập lại'
+                );
+
+                setToken('');
+                logout();
+              } catch (err) {
+                setPasswordError(err);
+              } finally {
+                setPasswordBusy(false);
+              }
+            }}
+          >
+
+            <h2>
+              Đổi mật khẩu
+            </h2>
+
+            <Field
+              id="current-password"
+              label="Mật khẩu hiện tại"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={secrets.current_password}
+              onChange={e =>
+                setSecrets({
+                  ...secrets,
+                  current_password: e.target.value
+                })
+              }
+            />
+
+            <Field
+              id="new-password"
+              label="Mật khẩu mới"
+              type="password"
+              autoComplete="new-password"
+              minLength="8"
+              required
+              value={secrets.password}
+              onChange={e =>
+                setSecrets({
+                  ...secrets,
+                  password: e.target.value
+                })
+              }
+            />
+
+            <ErrorBox error={passwordError} />
+
+            <button
+              id="change-password"
+              className="btn secondary"
+              disabled={passwordBusy}
+            >
+              Đổi mật khẩu
+            </button>
+
+          </form>
+  );
+
+  if (user.role === 'customer') {
+    const initials = user.name.trim().split(/\s+/).slice(-2).map(part => part[0]).join('').toUpperCase();
+    return (
+      <main className="account-page">
+        <header className="account-heading">
+          <span className="eyebrow">Tài khoản của bạn</span>
+          <h1>Chào {user.name}, hôm nay uống gì?</h1>
+          <p>Quản lý thông tin và tìm lại những ly ngon bạn yêu thích.</p>
+        </header>
+        <div className="account-layout">
+          <aside className="account-sidebar" aria-label="Thông tin tài khoản">
+            <section className="account-profile-card">
+              <div className="account-avatar" aria-hidden="true">{initials || 'M'}</div>
+              <h2>{user.name}</h2>
+              <dl className="account-contact">
+                <div><dt>Số điện thoại</dt><dd>{user.phone || 'Chưa cập nhật'}</dd></div>
+                <div><dt>Email</dt><dd>{user.email || 'Chưa cập nhật'}</dd></div>
+              </dl>
+              <details className="account-editor">
+                <summary>Chỉnh sửa hồ sơ</summary>
+                {profileForm}
+              </details>
+              <details className="account-security">
+                <summary>Đổi mật khẩu</summary>
+                {passwordForm}
+              </details>
+            </section>
+            <button type="button" className="btn secondary account-logout" onClick={logout}>Đăng xuất</button>
+          </aside>
+          <AccountHistory />
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="container narrow">
+
+      <Title
+        title="Tài khoản của tôi"
+        sub={
+          'Tên đăng nhập: ' +
+          user.username +
+          ' · Vai trò: ' +
+          ({
+            customer: 'Khách hàng',
+            staff: 'Nhân viên',
+            admin: 'Quản trị'
+          }[user.role])
+        }
+      />
+
+      <div className="grid-2">
+
+        {profileForm}
+
+        <div className="stack">
+
+          {passwordForm}
+
+          {user.role === 'customer' && (
+            <Link
+              className="btn secondary"
+              to="/orders"
+            >
+              Xem đơn hàng của tôi
+            </Link>
+          )}
+
+        </div>
+      </div>
+    </main>
+  );
+}

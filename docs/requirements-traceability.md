@@ -6,7 +6,7 @@ Tham khảo bản chụp yêu cầu và sơ đồ ở [reference](./reference/).
 
 ## Kết quả kiểm tra ngày 03/11/2026
 
-- Backend: **63 test cases Pass, 0 Fail**, chạy trên Microsoft SQL Server LocalDB riêng.
+- Backend cập nhật 04/11/2026: **76 test cases Pass, 0 Fail**, chạy trên Microsoft SQL Server LocalDB riêng.
 - Schema được tạo bằng Alembic, không thay SQL Server bằng SQLite.
 - Dữ liệu seed được reset cho mỗi test; không chạy trên database demo đang dùng.
 - Frontend: lint và production build Pass.
@@ -50,8 +50,8 @@ Tham khảo bản chụp yêu cầu và sơ đồ ở [reference](./reference/).
 2. Kiểm tra kho khi đặt đơn **và** khi nhân viên bắt đầu pha. Đơn chờ chưa giữ chỗ kho.
 3. Chỉ trừ nguyên liệu ở `pending → preparing`, trong cùng transaction với trạng thái và audit.
 4. SQL Server `sp_getapplock` tuần tự hóa thao tác ghi, phù hợp quy mô demo nhỏ.
-5. Hủy trước pha không trừ kho. Sau pha chỉ admin hủy có lý do; không hoàn nguyên liệu đã dùng.
-6. Khách chỉ hủy đơn của mình khi `pending`; staff không hủy, không sửa menu/kho.
+5. Chỉ khách sở hữu được hủy khi đơn còn pending và chưa đủ 60 giây từ created_at; hủy không trừ kho. Hết hạn hoặc đã nhận pha thì không được hủy.
+6. Staff và admin không được hủy qua /cancel hoặc /status, kể cả gửi lại trên đơn đã hủy. UI khách đếm ngược theo deadline do server trả về; tải lại không gia hạn.
 7. Không xóa cứng master data. Đơn cũ giữ tên/giá/ảnh/cấu hình/định lượng snapshot.
 8. Doanh thu chỉ ghi khi **hoàn tất + đã thu COD**; ngày ghi nhận là thời điểm muộn hơn.
 9. Không thu tiền thật, không cổng thanh toán, không giao hàng real-time theo giới hạn đề.
@@ -66,3 +66,7 @@ Tham khảo bản chụp yêu cầu và sơ đồ ở [reference](./reference/).
 - Đo tải nhiều người dùng hoặc SLA 24/7. Bản local chỉ chạy khi backend và SQL Server đang mở.
 
 Không gọi toàn bộ bài nộp “100% hoàn thành” chỉ dựa vào test local.
+
+## Làm rõ quyền hủy ngày 04/11/2026
+
+Yêu cầu mới của chủ dự án thay thế mô tả staff/admin hủy trong tài liệu cũ. USC06/FR06: khách sở hữu chỉ hủy pending trong 60 giây; USC07: nhân viên/quản lý chỉ xử lý tiến trình và COD, không hủy. Bằng chứng: `test_workers_cannot_cancel_via_either_endpoint`, `test_customer_cancellation_server_deadline` và `test_cancel_stock_policy_before_and_after_preparing`. Các PDF/DOCX nguồn được giữ nguyên; nhóm cần cập nhật bản báo cáo/use case đang nộp cho khớp quyết định này.

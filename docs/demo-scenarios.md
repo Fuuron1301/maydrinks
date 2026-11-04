@@ -5,7 +5,7 @@
 1. Dùng database **demo riêng**, chạy migration rồi `python backend/manage.py seed`.
 2. Seed không reset database đã có tài khoản. Muốn demo sạch, tạo database mới và đổi chuỗi kết nối, không xóa DB đang dùng.
 3. Tài khoản `customer`, `staff`, `admin`; mật khẩu sinh ngẫu nhiên tại `backend/instance/demo-accounts.json` trên máy chạy seed. Không đưa tệp này lên GitHub.
-4. Có 16 đồ uống, 15 nguyên liệu, 3 size, 3 topping, mức đường/đá, 6 đơn ở 6 trạng thái và phiếu nhập nháp.
+4. Có 16 đồ uống, 15 nguyên liệu, 3 size, 3 topping, mức đường/đá, 5 đơn ở 5 trạng thái và phiếu nhập nháp.
 5. Dùng cửa sổ riêng cho từng vai trò; sessionStorage tách phiên theo tab. Không dùng tài khoản admin để giả làm khách.
 
 ## Demo 1 — Chọn món → giỏ → COD → hoàn tất
@@ -16,7 +16,7 @@
 - Đơn `pending`, có snapshot tùy chọn và lịch sử. Tồn kho chưa đổi.
 - Staff mở danh sách đơn, **Tải lại đơn**, vào đơn và chuyển `preparing`.
 - Kiểm tra tồn giảm đúng công thức + topping và chỉ giảm một lần.
-- Staff chuyển `ready`, xác nhận thu COD, `delivering → completed` hoặc hoàn tất tại quầy.
+- Staff chuyển `ready`, xác nhận thu COD và chuyển `completed`.
 - Admin xem báo cáo: chỉ ghi nhận doanh thu khi đơn hoàn tất **và** đã thu tiền.
 - Khách mở lại chi tiết, nhấn **Tải lại trạng thái**, xem đầy đủ timeline.
 
@@ -38,12 +38,12 @@ Seed cố ý để **Siro dâu = 0 l**, món **Trà dâu tươi** vẫn còn bá
 - Phiếu đã xác nhận không sửa được. Gửi lại confirm không tăng kho lần hai.
 - Kiểm tra lịch sử xuất nhập và cảnh báo ngưỡng.
 
-## Demo 4 — Hủy trước/sau mốc trừ kho
+## Demo 4 — Hủy trong 60 giây, khóa quyền staff/admin
 
-- Khách đặt đơn rồi hủy khi `pending`: tồn không đổi.
+- Khách đặt đơn, UI đếm ngược 60 giây; hủy khi pending và còn thời hạn: tồn không đổi. Tải lại trang không đặt lại thời hạn.
 - Staff nhận pha một đơn khác: tồn bị trừ.
 - Khách thử hủy sau pha: bị 403.
-- Admin hủy với lý do trước khi thu COD: tồn **không hoàn**, lịch sử nêu nguyên liệu đã sử dụng.
+- Staff/Admin không có nút hủy; gọi /cancel hoặc /status=cancelled trực tiếp bị 403, trạng thái/kho/lịch sử không đổi. Khách đợi đủ 60 giây khi vẫn pending: nút khóa, API trả 409.
 - Đơn đã hoàn tất hoặc đã thu COD không được hủy trong phạm vi demo này.
 
 ## Demo 5 — Menu/công thức và lịch sử
@@ -71,7 +71,7 @@ Seed cố ý để **Siro dâu = 0 l**, món **Trà dâu tươi** vẫn còn bá
 | Nhận món | Ghi giấy, dễ nhầm tùy chọn | Giỏ có cấu hình, quote server, snapshot đơn |
 | Xác nhận nguyên liệu | Nhân viên kiểm tra thủ công | Kiểm tra kho lúc đặt và nhận pha; transaction chống tồn âm |
 | Trừ nguyên liệu | Cuối ca khó đối chiếu | Trừ theo công thức khi nhận pha, log từng lần |
-| Hủy | Không rõ nguyên liệu đã dùng | Trước pha không trừ; sau pha không hoàn, lưu lý do |
+| Hủy | Không rõ nguyên liệu đã dùng | Khách hủy pending trong 60 giây thì không trừ; sau nhận pha khóa hủy cho mọi vai trò |
 | Nhập kho | Ghi sổ/tồn cộng tay | Phiếu nháp → xác nhận, không cộng trùng |
 | Món tạm hết | Báo miệng | Cảnh báo tồn/món rủi ro và admin bật/tắt |
 
