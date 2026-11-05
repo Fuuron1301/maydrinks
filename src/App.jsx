@@ -97,7 +97,7 @@ function Navigation({ session, onLogout, cartCount }) {
           </NavLink>
           <NavLink to="/menu">Thực đơn</NavLink>
           {role === "customer" && <NavLink to="/orders">Đơn của tôi</NavLink>}
-          {(role === "staff" || role === "admin") && (
+          {role === "staff" && (
             <NavLink to="/staff/board">Đơn hàng</NavLink>
           )}
           {role === "admin" && <NavLink to="/admin/overview">Quản trị</NavLink>}
@@ -146,7 +146,7 @@ function AppRoutes({
     </Guard>
   );
   const staff = (children) => (
-    <Guard session={session} roles={["staff", "admin"]}>
+    <Guard session={session} roles={["staff"]}>
       <Workspace type="staff">{children}</Workspace>
     </Guard>
   );

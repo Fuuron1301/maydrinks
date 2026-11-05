@@ -63,6 +63,10 @@ def main(argv=None):
                 else:
                     print('No credential file on this machine; existing passwords were not changed.')
         else:
+            with app.app_context():
+                db.session.execute(text("DELETE FROM order_status_history WHERE status='delivering'"))
+                db.session.execute(text("UPDATE orders SET status='ready' WHERE status='delivering'"))
+                db.session.commit()
             from waitress import serve
             print('API: http://127.0.0.1:' + os.environ.get('PORT', '8000'))
             serve(app, host='127.0.0.1', port=int(os.environ.get('PORT', '8000')))
