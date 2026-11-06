@@ -35,6 +35,12 @@ def new_order(app, drink_id='M005', quantity=1):
 
 
 def state(client, auth, order_id, before, after):
+    # Nhân viên/quản lý chỉ thấy đơn sau khi hết 60 giây hủy của khách.
+    with client.application.app_context():
+        order = db.session.get(Order, order_id)
+        if order and order.status == 'pending' and order.created_at > utcnow() - timedelta(seconds=61):
+            order.created_at = utcnow() - timedelta(seconds=61)
+            db.session.commit()
     return client.post('/api/orders/' + order_id + '/status', headers=auth,
                        json={'expected_status': before, 'status': after})
 
@@ -309,6 +315,10 @@ def test_coupon_and_cod_revenue_recognition(app, client):
     assert order['subtotal'] == 72000 and order['discount'] == 7200 and order['total'] == 64800
     before = client.get('/api/admin/reports', headers=admin).json['revenue']
     order_id = order['id']
+    assert client.post('/api/orders/' + order_id + '/payment', headers=staff, json={'amount': 64800}).status_code == 404
+    with app.app_context():
+        db.session.get(Order, order_id).created_at = utcnow() - timedelta(seconds=61)
+        db.session.commit()
     assert client.post('/api/orders/' + order_id + '/payment', headers=staff, json={'amount': 64800}).status_code == 409
     assert state(client, staff, order_id, 'pending', 'preparing').status_code == 200
     assert state(client, staff, order_id, 'preparing', 'ready').status_code == 200
@@ -555,3 +565,21 @@ def test_customer_cancellation_server_deadline(app, client, monkeypatch, age, ex
         count = db.session.scalar(select(func.count()).select_from(StatusHistory).where(
             StatusHistory.order_id == key, StatusHistory.status == 'cancelled'))
         assert count == (1 if expected == 200 else 0)
+
+
+def test_new_order_hidden_from_staff_and_admin_during_cancel_window(app, client):
+    order_id = new_order(app)
+    staff, admin, customer = headers(app, 'staff'), headers(app), headers(app, 'customer')
+    for auth in (staff, admin):
+        assert order_id not in [o['id'] for o in client.get('/api/orders', headers=auth).json]
+        assert client.get('/api/orders/' + order_id, headers=auth).status_code == 404
+        assert client.post('/api/orders/' + order_id + '/status', headers=auth,
+                           json={'expected_status': 'pending', 'status': 'preparing'}).status_code == 404
+    assert order_id in [o['id'] for o in client.get('/api/orders', headers=customer).json]
+    with app.app_context():
+        order = db.session.get(Order, order_id)
+        order.created_at = utcnow() - timedelta(seconds=61)
+        order.status = 'pending'
+        db.session.commit()
+    for auth in (staff, admin):
+        assert order_id in [o['id'] for o in client.get('/api/orders', headers=auth).json]

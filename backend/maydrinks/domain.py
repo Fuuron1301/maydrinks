@@ -153,6 +153,10 @@ CANCELLATION_SECONDS = 60
 def cancellation_deadline(order):
     return order.created_at + timedelta(seconds=CANCELLATION_SECONDS)
 
+def in_cancel_window(order):
+    """Đơn mới còn trong 60 giây hủy: chỉ khách thấy, nhân viên/quản lý chưa thấy."""
+    return order.status=='pending' and utcnow() < cancellation_deadline(order)
+
 def order_data(order):
     items=order_items(order)
     for item in items: item.pop('requirements',None)

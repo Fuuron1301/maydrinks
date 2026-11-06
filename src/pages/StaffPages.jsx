@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Data, Empty, ErrorBox, Status, useAction } from '../components/UI';
 import { choiceText, dateTime, labels, money } from '../services/api';
@@ -68,13 +68,24 @@ function BoardContent({ orders, reload, notify }) {
   );
 }
 
+function useTick(ms = 10000) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setTick(value => value + 1), ms);
+    return () => window.clearInterval(timer);
+  }, [ms]);
+  return tick;
+}
+
 export function StaffBoard({ notify }) {
-  return <main className="staff-page"><Data path="/orders">{(orders, reload) => <BoardContent orders={orders} reload={reload} notify={notify} />}</Data></main>;
+  const tick = useTick();
+  return <main className="staff-page"><Data path="/orders" refresh={tick}>{(orders, reload) => <BoardContent orders={orders} reload={reload} notify={notify} />}</Data></main>;
 }
 
 export function StaffOrders() {
   const [filter, setFilter] = useState('all');
-  return <main className="staff-page"><Data path="/orders">{(orders, reload) => {
+  const tick = useTick();
+  return <main className="staff-page"><Data path="/orders" refresh={tick}>{(orders, reload) => {
     const options = ['all', ...stages, 'cancelled'];
     const shown = orders.filter(order => filter === 'all' || order.status === filter);
     return <>

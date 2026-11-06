@@ -25,6 +25,7 @@ def owned_order(key):
     order=db.session.scalar(select(Order).where((Order.id==key)|(Order.code==key)))
     if not order: raise DomainError('Không tìm thấy đơn.',404)
     if g.user.role=='customer' and order.user_id!=g.user.id: raise DomainError('Không tìm thấy đơn.',404)
+    if g.user.role!='customer' and in_cancel_window(order): raise DomainError('Không tìm thấy đơn.',404)
     return order
 
 def image_url(value):
@@ -106,7 +107,9 @@ def orders():
     if g.user.role=='customer': query=query.where(Order.user_id==g.user.id)
     if request.args.get('status'): query=query.where(Order.status==request.args['status'])
     if request.args.get('q'): query=query.where((Order.code.contains(request.args['q'],autoescape=True))|(Order.recipient.contains(request.args['q'],autoescape=True)))
-    return jsonify([order_data(x) for x in db.session.scalars(query.order_by(Order.created_at.desc()))])
+    rows=db.session.scalars(query.order_by(Order.created_at.desc()))
+    if g.user.role!='customer': rows=[x for x in rows if not in_cancel_window(x)]
+    return jsonify([order_data(x) for x in rows])
 
 @api.get('/orders/request/<key>')
 @require('customer')

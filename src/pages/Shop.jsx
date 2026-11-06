@@ -708,6 +708,11 @@ export function Checkout({ user, onCart, notify }) {
 }
 export function Orders({ user }) {
   const [version, setVersion] = useState(0);
+  useEffect(() => {
+    if (user.role === "customer") return undefined;
+    const timer = window.setInterval(() => setVersion((x) => x + 1), 10000);
+    return () => window.clearInterval(timer);
+  }, [user.role]);
   return (
     <main className="container">
       <Title
