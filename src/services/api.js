@@ -1,6 +1,6 @@
-const configured = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "";
-// Development uses Vite's reverse proxy; production requires a public HTTPS API.
-export const apiBase = configured || (import.meta.env.DEV ? "/api" : "");
+const rawApi = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "";
+const configured = rawApi ? (rawApi.endsWith("/api") ? rawApi : `${rawApi}/api`) : "";
+export const apiBase = configured || "/api";
 let token = sessionStorage.getItem("may-auth-token") || "";
 export const hasToken = () => Boolean(token);
 export function setToken(value) {
